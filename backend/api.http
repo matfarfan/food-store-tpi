@@ -1,0 +1,325 @@
+### =====================================================================
+### Food Store API — pruebas con REST Client (VS Code)
+### Antes: python -m app.db.seed  y  uvicorn app.main:app --reload
+### REST Client guarda la cookie access_token del login y la manda sola
+### en las peticiones siguientes (el último login es la sesión activa).
+### =====================================================================
+
+@baseUrl = http://localhost:8000/api/v1
+@json = application/json
+
+### ---------------------------------------------------------------------
+### AUTH
+### ---------------------------------------------------------------------
+
+### Registro (201) — si ya existe "cliente1" da 409
+POST {{baseUrl}}/auth/register
+Content-Type: {{json}}
+
+{
+  "username": "cliente1",
+  "full_name": "Cliente Uno",
+  "email": "cliente1@mail.com",
+  "password": "Cliente1234!"
+}
+
+### Registro con contraseña corta (422)
+POST {{baseUrl}}/auth/register
+Content-Type: {{json}}
+
+{
+  "username": "cliente2",
+  "full_name": "Cliente Dos",
+  "email": "cliente2@mail.com",
+  "password": "123"
+}
+
+### Login con credenciales incorrectas (401)
+POST {{baseUrl}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=cliente1&password=incorrecta
+
+### Login como CLIENTE (200, guarda la cookie)
+POST {{baseUrl}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=cliente1&password=Cliente1234!
+
+### Perfil del usuario de la sesión (200)
+GET {{baseUrl}}/auth/me
+
+### ---------------------------------------------------------------------
+### CATÁLOGO (lecturas públicas)
+### ---------------------------------------------------------------------
+
+### Categorías activas
+GET {{baseUrl}}/categorias
+
+### Productos paginados (total + items)
+GET {{baseUrl}}/productos?skip=0&limit=5
+
+### Búsqueda por nombre sin distinguir mayúsculas + filtro por categoría
+GET {{baseUrl}}/productos?search=PIZZA&categoria_id=1
+
+### Detalle de producto con su categoría
+GET {{baseUrl}}/productos/1
+
+### Producto inexistente (404)
+GET {{baseUrl}}/productos/999
+
+### Cliente intenta crear categoría (403)
+POST {{baseUrl}}/categorias
+Content-Type: {{json}}
+
+{ "nombre": "Postres" }
+
+### ---------------------------------------------------------------------
+### PEDIDOS como cliente
+### ---------------------------------------------------------------------
+
+### Crear pedido (201): descuenta stock y copia nombre y precio
+# @name pedidoCliente
+POST {{baseUrl}}/pedidos
+Content-Type: {{json}}
+
+{
+  "items": [
+    { "producto_id": 1, "cantidad": 2 },
+    { "producto_id": 6, "cantidad": 3 }
+  ],
+  "forma_pago": "EFECTIVO",
+  "direccion_entrega": "San Martín 123",
+  "notas": "Sin aceitunas"
+}
+
+
+### Producto repetido (400)
+POST {{baseUrl}}/pedidos
+Content-Type: {{json}}
+
+{
+  "items": [
+    { "producto_id": 1, "cantidad": 1 },
+    { "producto_id": 1, "cantidad": 2 }
+  ],
+  "forma_pago": "EFECTIVO",
+  "direccion_entrega": "San Martín 123"
+}
+
+### Stock insuficiente en el 2.º ítem (400): rollback, el 1.º NO descuenta stock
+POST {{baseUrl}}/pedidos
+Content-Type: {{json}}
+
+{
+  "items": [
+    { "producto_id": 2, "cantidad": 1 },
+    { "producto_id": 3, "cantidad": 9999 }
+  ],
+  "forma_pago": "TRANSFERENCIA",
+  "direccion_entrega": "San Martín 123"
+}
+
+### Producto inexistente (404): tampoco se guarda nada
+POST {{baseUrl}}/pedidos
+Content-Type: {{json}}
+
+{
+  "items": [{ "producto_id": 999, "cantidad": 1 }],
+  "forma_pago": "EFECTIVO",
+  "direccion_entrega": "San Martín 123"
+}
+
+### Forma de pago inválida y dirección corta (422)
+POST {{baseUrl}}/pedidos
+Content-Type: {{json}}
+
+{
+  "items": [{ "producto_id": 1, "cantidad": 1 }],
+  "forma_pago": "TARJETA",
+  "direccion_entrega": "abc"
+}
+
+### Mis pedidos (solo los propios)
+GET {{baseUrl}}/pedidos
+
+### Detalle de mi pedido
+GET {{baseUrl}}/pedidos/{{pedidoCliente.response.body.id}}
+
+### Resumen como cliente (403)
+GET {{baseUrl}}/pedidos/resumen
+
+### Cambiar estado como cliente (403)
+PATCH {{baseUrl}}/pedidos/{{pedidoCliente.response.body.id}}/estado
+Content-Type: {{json}}
+
+{ "estado": "EN_PREPARACION" }
+
+### Cancelar mi pedido PENDIENTE (200): restituye el stock
+PATCH {{baseUrl}}/pedidos/{{pedidoCliente.response.body.id}}/cancelar
+
+### Verificar que el stock volvió
+GET {{baseUrl}}/productos/1
+
+### Cancelar otra vez (400: ya no está PENDIENTE)
+PATCH {{baseUrl}}/pedidos/{{pedidoCliente.response.body.id}}/cancelar
+
+### Un pedido nuevo para que lo gestione el admin
+# @name pedidoParaAdmin
+POST {{baseUrl}}/pedidos
+Content-Type: {{json}}
+
+{
+  "items": [{ "producto_id": 4, "cantidad": 1 }],
+  "forma_pago": "TRANSFERENCIA",
+  "direccion_entrega": "Belgrano 456"
+}
+
+
+### ---------------------------------------------------------------------
+### ADMIN
+### ---------------------------------------------------------------------
+
+### Login como ADMIN (usuario del seed)
+POST {{baseUrl}}/auth/token
+Content-Type: application/x-www-form-urlencoded
+
+username=admin&password=Admin1234!
+
+### --- Categorías ---
+
+### Crear categoría (201)
+# @name nuevaCategoria
+POST {{baseUrl}}/categorias
+Content-Type: {{json}}
+
+{ "nombre": "Postres", "descripcion": "Dulces caseros" }
+
+
+### Nombre repetido sin importar mayúsculas (409)
+POST {{baseUrl}}/categorias
+Content-Type: {{json}}
+
+{ "nombre": "pizzas" }
+
+### PUT parcial: solo la descripción (200)
+PUT {{baseUrl}}/categorias/{{nuevaCategoria.response.body.id}}
+Content-Type: {{json}}
+
+{ "descripcion": "Helados y tortas" }
+
+### --- Productos ---
+
+### Crear producto (201)
+# @name nuevoProducto
+POST {{baseUrl}}/productos
+Content-Type: {{json}}
+
+{
+  "nombre": "Flan casero",
+  "descripcion": "Con dulce de leche",
+  "precio_base": 2500,
+  "stock": 10,
+  "categoria_id": {{nuevaCategoria.response.body.id}}
+}
+
+
+### Crear con categoría inexistente (404)
+POST {{baseUrl}}/productos
+Content-Type: {{json}}
+
+{ "nombre": "X", "precio_base": 1, "categoria_id": 999 }
+
+### Crear con precio negativo (422)
+POST {{baseUrl}}/productos
+Content-Type: {{json}}
+
+{ "nombre": "X", "precio_base": -5, "categoria_id": 1 }
+
+### PUT parcial: solo el precio (200)
+PUT {{baseUrl}}/productos/{{nuevoProducto.response.body.id}}
+Content-Type: {{json}}
+
+{ "precio_base": 2800 }
+
+### PATCH de stock y disponibilidad (200)
+PATCH {{baseUrl}}/productos/{{nuevoProducto.response.body.id}}/stock
+Content-Type: {{json}}
+
+{ "stock": 25, "disponible": true }
+
+### Baja lógica del producto (204)
+DELETE {{baseUrl}}/productos/{{nuevoProducto.response.body.id}}
+
+### Producto dado de baja = inexistente (404)
+GET {{baseUrl}}/productos/{{nuevoProducto.response.body.id}}
+
+### Baja lógica de la categoría (204)
+DELETE {{baseUrl}}/categorias/{{nuevaCategoria.response.body.id}}
+
+### La baja no libera el nombre (409)
+POST {{baseUrl}}/categorias
+Content-Type: {{json}}
+
+{ "nombre": "Postres" }
+
+### --- Pedidos ---
+
+### Todos los pedidos (admin ve los de todos)
+GET {{baseUrl}}/pedidos
+
+### Filtro por estado
+GET {{baseUrl}}/pedidos?estado=PENDIENTE
+
+### Transición inválida PENDIENTE → ENTREGADO (400)
+PATCH {{baseUrl}}/pedidos/{{pedidoParaAdmin.response.body.id}}/estado
+Content-Type: {{json}}
+
+{ "estado": "ENTREGADO" }
+
+### PENDIENTE → EN_PREPARACION (200)
+PATCH {{baseUrl}}/pedidos/{{pedidoParaAdmin.response.body.id}}/estado
+Content-Type: {{json}}
+
+{ "estado": "EN_PREPARACION" }
+
+### EN_PREPARACION → ENTREGADO (200)
+PATCH {{baseUrl}}/pedidos/{{pedidoParaAdmin.response.body.id}}/estado
+Content-Type: {{json}}
+
+{ "estado": "ENTREGADO" }
+
+### Estado terminal: ENTREGADO → CANCELADO (400)
+PATCH {{baseUrl}}/pedidos/{{pedidoParaAdmin.response.body.id}}/estado
+Content-Type: {{json}}
+
+{ "estado": "CANCELADO" }
+
+### Resumen del panel
+GET {{baseUrl}}/pedidos/resumen
+
+### No existe borrado de pedidos (405)
+DELETE {{baseUrl}}/pedidos/{{pedidoParaAdmin.response.body.id}}
+
+### --- Usuarios ---
+
+### Listado de usuarios
+GET {{baseUrl}}/admin/usuarios
+
+### El admin no puede desactivarse a sí mismo (400)
+POST {{baseUrl}}/admin/usuarios/1/desactivar
+
+### Desactivar al cliente (200)
+POST {{baseUrl}}/admin/usuarios/2/desactivar
+
+### Activar al cliente (200)
+POST {{baseUrl}}/admin/usuarios/2/activar
+
+### Usuario inexistente (404)
+POST {{baseUrl}}/admin/usuarios/999/activar
+
+### Logout (borra la cookie)
+POST {{baseUrl}}/auth/logout
+
+### Sin sesión (401)
+GET {{baseUrl}}/auth/me
