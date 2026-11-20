@@ -1,6 +1,7 @@
 # Food Store — Trabajo Práctico Integrador
 
 **Programación IV · Tecnicatura Universitaria en Programación a Distancia (UTN)**
+
 Alumno: **Matías Farfán**
 
 Aplicación de pedidos de comida: los clientes navegan el catálogo, arman el carrito y confirman pedidos.
@@ -85,7 +86,8 @@ python -m app.db.seed
 uvicorn app.main:app --reload
 ```
 
-- API: http://localhost:8000/api/v1
+- Verificación rápida: http://localhost:8000/health responde `{"status": "ok"}`
+- Todos los endpoints de la API están bajo el prefijo `/api/v1` (por ejemplo, http://localhost:8000/api/v1/productos)
 - Documentación Swagger: http://localhost:8000/docs (y ReDoc en http://localhost:8000/redoc)
 - `backend/api.http` tiene todas las peticiones de prueba para la extensión REST Client de VS Code.
 
