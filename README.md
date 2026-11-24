@@ -8,7 +8,7 @@ Aplicación de pedidos de comida: los clientes navegan el catálogo, arman el ca
 El administrador gestiona categorías, productos, stock, pedidos y usuarios, y ve un resumen del negocio.
 
 - **Repositorio:** https://github.com/matfarfan/food-store-tpi
-- **Video de demostración:** _(completar con el link público del video)_
+- **Video de demostración:** https://drive.google.com/file/d/179W9R6qhsCIVXAtVqntPr04v46vuG0vQ/view?usp=drive_link
 
 ---
 
@@ -71,6 +71,8 @@ python -m venv .venv
 # Activarlo:
 #   Windows (PowerShell):  .venv\Scripts\Activate.ps1
 #   Linux / macOS:         source .venv/bin/activate
+#   Si PowerShell dice que la ejecución de scripts está deshabilitada:
+#     Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 # Dependencias
 pip install -r requirements.txt
